@@ -1,0 +1,16 @@
+#
+# procmailrc.sample
+#
+# Example procmail script for processing SVN commit notification emails for use
+# with irker-svnpoller.
+#
+# Adjust configuration as necessary and add to the ~/.procmailrc file.
+#
+
+# This is the path to the svnmail-filter script.
+MAILFILTER=$HOME/bin/svnmail-filter
+
+# Filter all email with numbers in the subject line.
+:0
+* ^Subject: .*[0-9]+
+| $MAILFILTER
