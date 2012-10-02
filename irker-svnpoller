@@ -22,7 +22,7 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 """
 
-import argparse, json, pysvn, socket, sys
+import argparse, json, os, pysvn, re, socket, sys
 
 IRKER_HOST = 'localhost'
 IRKER_PORT = 6659
@@ -63,9 +63,47 @@ class IrkerSVNSource:
         }
         return msg
 
-    def _format_paths(self, files):
-        "TODO"
-        return 'PLACEHOLDER'
+    def _format_paths(self, paths_dict):
+        "Format a commit's changed paths list for display in a similar "
+        "fashion to that of CIA bots."
+        prefix, relative_paths = self._consolidate_paths(paths_dict)
+        filelist_str = ' '.join(relative_paths)
+        if len(filelist_str) > 60:
+            filelist_str = self._format_path_summary(relative_paths)
+        if prefix.startswith('/'):
+            prefix = prefix[1:]
+        if filelist_str:
+            return "%s (%s)" % (prefix, filelist_str)
+        return prefix
+
+    def _consolidate_paths(self, paths_dict):
+        "Return the common prefix for a commit's changed paths and the "
+        "relative paths for each affected file."
+        paths = []
+        for entry in paths_dict:
+            paths.append(entry['path'])
+        # Optimization: if we only have one file, don't waste CPU on any of the other
+        # stuff we do to pretend to be CIA.
+        if len(paths) == 1:
+            return paths[0], []
+        prefix = re.sub("[^/]*$", "", os.path.commonprefix(paths))
+        relative_paths = []
+        for path in paths:
+            relative = path[len(prefix):].strip()
+            if relative == '':
+                relative = '.'
+            relative_paths.append(relative)
+        return prefix, relative_paths
+
+    def _format_path_summary(self, relative_paths):
+        "Return a changed paths count summary for display."
+        dirs = {}
+        for path in relative_paths:
+            dirs[os.path.split(path)[0]] = True
+        if len(dirs) <= 1:
+            return "%d files" % len(relative_paths)
+        return "%d files in %d dirs" % (len(relative_paths), len(dirs))
+
 
 def deliver_to_irker(uri, message):
     "Delivers the given notification for a single channel to irkerd."
@@ -79,6 +117,7 @@ def deliver_to_irker(uri, message):
             sock.sendto(envelope + "\n", (host, port))
         finally:
             sock.close()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
