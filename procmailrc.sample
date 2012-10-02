@@ -10,7 +10,11 @@
 # This is the path to the svnmail-filter script.
 MAILFILTER=$HOME/bin/svnmail-filter
 
-# Filter all email with numbers in the subject line.
-:0
+# Filter all email with numbers in the subject line, unless
+# they come from -request ML addresses. Also, only filter
+# headers, since svnmail-filter ignores the body.
+
+:0 h
 * ^Subject: .*[0-9]+
+* !^From: .*-request@
 | $MAILFILTER
