@@ -25,7 +25,7 @@ SVN repository. Notifications may be delivered to a single channel, or to
 multiple channels, and they may even be delivered to additional channels for
 specific authors.
 
-It’s primarily intended for use with **procmail(1)** or any other method that
+It is primarily intended for use with **procmail(1)** or any other method that
 allows filtering incoming mail through a script.
 
 Example .procmailrc and filter ruleset files are provided in the distribution.
