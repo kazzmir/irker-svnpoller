@@ -64,7 +64,7 @@ class SVNMailNotification:
                 pattern = ruleset['pattern']
             else:
                 pattern = DEFAULT_SUBJECT_PATTERN
-            subj_match = re.match(pattern, msg.get('Subject'))
+            subj_match = re.search(pattern, msg.get('Subject'))
             if subj_match:
                 self.revision = int(subj_match.group(1))
             # From is the committer's email address. It
