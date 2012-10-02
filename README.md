@@ -77,8 +77,8 @@ These objects are structured as follows:
    literal brackets) need to be escaped for JSON too, e.g.
    `\\project name\\]`.
 
- * **project**: The project id/name used for `irkerd` notifications via
-   `irker-svnpoller`.
+ * **project**: The project id/name used for **irkerd** notifications via
+   **irker-svnpoller**.
 
  * **repository**: The URI for the SVN repository. Commit logs are pulled from
    this URI. **It must be an authentication-free repository**, usually using
