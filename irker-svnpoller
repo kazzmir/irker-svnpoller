@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+"""
+irker-svnpoller.pl - Polls a specified SVN commit and sends it to
+                     an IRC channel using irkerd.
+
+Copyright (C) 2012 by Ignacio Riquelme Morelle <shadowm2006@gmail.com>
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice is present in all copies.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+"""
+
+import argparse, json, pysvn, socket, sys
+
+IRKER_HOST = 'localhost'
+IRKER_PORT = 6659
+
+# TEMPLATE = "%(bold)s%(project)s:%(bold)s %(green)s%(author)s%(reset)s %(yellow)s%(branch)s%(reset)s * r%(bold)s%(revision)s%(bold)s %(module)s/%(files)s%(bold)s:%(bold)s %(log)s"
+
+TEMPLATE = "%(bold)s%(project)s:%(bold)s %(green)s%(author)s%(reset)s * r%(bold)s%(revision)s%(bold)s /%(files)s%(bold)s:%(bold)s %(log)s"
+
+debug = False
+simulate = False
+
+class IrkerSVNSource:
+    "Represents a SVN repository from which irker notifications are generated."
+    def __init__(self, project, repository):
+        self.project = project
+        self.repository = repository
+        self._client = pysvn.Client()
+        self._template = TEMPLATE
+    def generate_notification(self, revision):
+        "Generate a message for irkerd deliver from the given commit."
+        if revision.upper() == 'HEAD':
+            revobj = pysvn.Revision(pysvn.opt_revision_kind.head)
+        else:
+            revobj = pysvn.Revision(pysvn.opt_revision_kind.number, revision)
+        log = self._client.log(self.repository, revobj, revobj, True)[0]
+        msg = ''
+        if len(log):
+            msg = self._template % {
+                'bold': '\x02',
+                'green': '\x033',
+                'blue': '\x032',
+                'yellow': '\x037',
+                'reset': '\x0F',
+                'project': self.project,
+                'branch': '', # unused for SVN
+                'module': '', # unused for SVN
+                'revision': log['revision'].number,
+                'author': log['author'],
+                'log': log['message'],
+                'files': self._format_paths(log['changed_paths']),
+            }
+        return msg
+    def _format_paths(self, files):
+        "TODO"
+        return 'PLACEHOLDER'
+
+def deliver_to_irker(uri, message):
+    envelope = json.dumps({ "to": uri, "privmsg": message })
+    if debug:
+        print envelope
+    if not simulate:
+        (host, port) = (IRKER_HOST, IRKER_PORT)
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.sendto(envelope + "\n", (host, port))
+        finally:
+            sock.close()
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', action='store_true', dest='debug',
+                        help="show extra debugging information")
+    parser.add_argument('-n', action='store_true', dest='simulate',
+                        help="simulate, don't send anything to irker")
+    parser.add_argument('project_id')
+    parser.add_argument('repository_URI')
+    parser.add_argument('revision_or_HEAD')
+    parser.add_argument('channel_URI', nargs='*')
+    args = parser.parse_args()
+    debug = args.debug
+    simulate = args.simulate
+    source = IrkerSVNSource(args.project_id, args.repository_URI)
+    try:
+        message = source.generate_notification(args.revision_or_HEAD)
+        for uri in args.channel_URI:
+            deliver_to_irker(uri, message)
+    except pysvn.ClientError, e:
+        sys.stderr.write("pysvn.ClientError: %s\n" % e.message)
+
+# kate: indent-mode normal; encoding utf-8; space-indent on;
