@@ -1,0 +1,110 @@
+#!/usr/bin/env python
+"""
+svnmail-filter - Parses incoming emails and calls irker-svnpoller
+                 accordingly
+
+Copyright (C) 2012 by Ignacio Riquelme Morelle <shadowm2006@gmail.com>
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice is present in all copies.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+"""
+
+import email, json, os, re, sys
+
+script_path = sys.path[0] if sys.path[0] else '.'
+
+# The path to the SVN poller script, which is in charge of
+# fetching commits and delivering the notifications to irker.
+SVNPOLLER = script_path + '/irker-svnpoller'
+
+# The path to the rulesets JSON file.
+RULES_FILE = script_path + '/svnmail-rules.json'
+
+# The regular expression used to match a revision number in
+# email subjects when there isn't one specified for a given
+# ruleset.
+DEFAULT_SUBJECT_PATTERN = r"\sr([0-9]+)\s"
+
+# No user-serviceable parts below this line.
+
+rules = json.load(open(RULES_FILE))
+if not rules:
+    sys.stderr.write("Could not read any filter rules from %s.\n" % RULES_FILE)
+    exit(1)
+
+class SVNMailNotification:
+    def __init__(self, msg):
+        self.processed = False
+        self.author = None
+        self.project_id = None
+        self.repository = None
+        self.delivery_channels = []
+        self.revision = 0
+        # To is the mailing list address. The message
+        # comes from the mailing list for our purposes.
+        mto = msg.get('To').lower()
+        if self._is_to_address_recognized(mto) != -1:
+            ruleset = rules[mto]
+            self.project_id = ruleset['project']
+            self.repository = ruleset['repository']
+            if 'pattern' in ruleset:
+                pattern = ruleset['pattern']
+            else:
+                pattern = DEFAULT_SUBJECT_PATTERN
+            subj_match = re.match(pattern, msg.get('Subject'))
+            if subj_match:
+                self.revision = int(subj_match.group(1))
+            # From is the committer's email address. It
+            # does not necessarily match their SVN user
+            # name.
+            self.author = email.utils.parseaddr(msg.get('From'))[1]
+            if 'channels' in ruleset and type(ruleset['channels']) == type({}):
+                for author_pattern in ruleset['channels']:
+                    if author_pattern != '*':
+                        if not '@' in author_pattern:
+                            match_author = self.author.split('@', 1)[0]
+                        else:
+                            match_author = self.author
+                        if author_pattern.lower() != match_author.lower():
+                            continue
+                    author_channels = ruleset['channels'][author_pattern]
+                    if type(author_channels) != type([]):
+                        author_channels = [ author_channels ]
+                    for channel in author_channels:
+                        self.delivery_channels.append(channel)
+            self.processed = True
+
+    def _is_to_address_recognized(self, to):
+        "Returns whether there's a ruleset for the given mail To address."
+        realto = email.utils.parseaddr(to)[1]
+        return realto in rules
+
+    def deliver_to_all(self):
+        "Invokes the SVN poller mechanism to deliver notifications to every "
+        "configured channel."
+        if not self.processed:
+            return
+        args = [ SVNPOLLER, self.project_id, self.repository,
+                str(self.revision) ] + self.delivery_channels
+        print "%s %s" % (SVNPOLLER, ' '.join(args))
+        os.execvp(SVNPOLLER, args)
+
+
+if __name__ == '__main__':
+    svnmail = SVNMailNotification(email.message_from_file(sys.stdin))
+    svnmail.deliver_to_all()
+
+# kate: indent-mode normal; encoding utf-8; space-indent on;
