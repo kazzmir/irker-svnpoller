@@ -27,8 +27,6 @@ import argparse, json, pysvn, socket, sys
 IRKER_HOST = 'localhost'
 IRKER_PORT = 6659
 
-# TEMPLATE = "%(bold)s%(project)s:%(bold)s %(green)s%(author)s%(reset)s %(yellow)s%(branch)s%(reset)s * r%(bold)s%(revision)s%(bold)s %(module)s/%(files)s%(bold)s:%(bold)s %(log)s"
-
 TEMPLATE = "%(bold)s%(project)s:%(bold)s %(green)s%(author)s%(reset)s * r%(bold)s%(revision)s%(bold)s /%(files)s%(bold)s:%(bold)s %(log)s"
 
 debug = False
@@ -41,6 +39,7 @@ class IrkerSVNSource:
         self.repository = repository
         self._client = pysvn.Client()
         self._template = TEMPLATE
+
     def generate_notification(self, revision):
         "Generate a message for irkerd deliver from the given commit."
         if revision.upper() == 'HEAD':
@@ -48,28 +47,28 @@ class IrkerSVNSource:
         else:
             revobj = pysvn.Revision(pysvn.opt_revision_kind.number, revision)
         log = self._client.log(self.repository, revobj, revobj, True)[0]
-        msg = ''
-        if len(log):
-            msg = self._template % {
-                'bold': '\x02',
-                'green': '\x033',
-                'blue': '\x032',
-                'yellow': '\x037',
-                'reset': '\x0F',
-                'project': self.project,
-                'branch': '', # unused for SVN
-                'module': '', # unused for SVN
-                'revision': log['revision'].number,
-                'author': log['author'],
-                'log': log['message'],
-                'files': self._format_paths(log['changed_paths']),
-            }
+        msg = self._template % {
+            'bold': '\x02',
+            'green': '\x033',
+            'blue': '\x032',
+            'yellow': '\x037',
+            'reset': '\x0F',
+            'project': self.project,
+            'branch': '', # unused for SVN
+            'module': '', # unused for SVN
+            'revision': log['revision'].number,
+            'author': log['author'],
+            'log': log['message'],
+            'files': self._format_paths(log['changed_paths'])
+        }
         return msg
+
     def _format_paths(self, files):
         "TODO"
         return 'PLACEHOLDER'
 
 def deliver_to_irker(uri, message):
+    "Delivers the given notification for a single channel to irkerd."
     envelope = json.dumps({ "to": uri, "privmsg": message })
     if debug:
         print envelope
