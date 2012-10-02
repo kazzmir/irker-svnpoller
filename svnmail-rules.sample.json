@@ -1,0 +1,42 @@
+{
+	"wesnoth-commits@gna.org" :
+	{
+		"pattern" : "\\[Wesnoth-commits\\] r([0-9]+)",
+		"project" : "wesnoth",
+		"repository" : "http://svn.gna.org/svn/wesnoth",
+		"channels" :
+		{
+			"*" :
+			[
+				"irc://irc.freenode.net/#wesnoth-dev",
+				"irc://irc.freenode.net/#commits"
+			],
+			"shadowm2006@gmail.com" :
+			[
+				"irc://irc.freenode.net/##shadowm"
+			],
+			"thecricket" :
+			[
+				"irc://irc.freenode.net/##Gambot"
+			]
+		}
+	},
+	"wesnoth-umc-dev-commits@lists.sourceforge.net" :
+	{
+		"pattern" : "wesnoth-umc-dev:\\[([0-9]+)\\]",
+		"project" : "wesnoth-umc-dev",
+		"repository" : "http://wesnoth-umc-dev.svn.sourceforge.net/svnroot/wesnoth-umc-dev",
+		"channels" :
+		{
+			"*" :
+			[
+				"irc://irc.freenode.net/#wesnoth-umc-dev",
+				"irc://irc.freenode.net/#commits"
+			],
+			"shikadilord" :
+			[
+				"irc://irc.freenode.net/##shadowm"
+			]
+		}
+	}
+}
