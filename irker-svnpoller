@@ -27,6 +27,8 @@ import argparse, json, os, pysvn, re, socket, sys
 IRKER_HOST = 'localhost'
 IRKER_PORT = 6659
 
+MAX_COMMIT_LINES = 5
+
 TEMPLATE = "%(bold)s%(project)s:%(bold)s %(green)s%(author)s%(reset)s * r%(bold)s%(revision)s%(bold)s /%(files)s%(bold)s:%(bold)s %(log)s"
 
 debug = False
@@ -115,7 +117,15 @@ class IrkerSVNSource:
 
 def deliver_to_irker(uri, message):
     "Delivers the given notification for a single channel to irkerd."
-    envelope = json.dumps({ "to": uri, "privmsg": message })
+    lines = []
+    for line in message.splitlines():
+        line = line.strip()
+        if line:
+            if len(lines) > MAX_COMMIT_LINES:
+                lines.append("(Log message trimmed.)")
+                break
+            lines.append(line)
+    envelope = json.dumps({ "to": uri, "privmsg": "\n".join(lines) })
     if debug:
         print envelope
     if not simulate:
