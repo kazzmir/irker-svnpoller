@@ -24,12 +24,23 @@ POSSIBILITY OF SUCH DAMAGE.
 
 import argparse, json, os, pysvn, re, socket, sys
 
-IRKER_HOST = 'localhost'
-IRKER_PORT = 6659
-
+# Maximum number of non-empty commit message lines to send
+# to irkerd. If there are more non-empty lines than this
+# value, "(Log message trimmed)" will be added in a new
+# line at the end.
 MAX_COMMIT_LINES = 5
 
+# Hostname to use when connecting to an irkerd instance.
+IRKER_HOST = 'localhost'
+
+# Port number to use when connecting to an irkerd instance.
+IRKER_PORT = 6659
+
+# The commit notification template. You probably do not
+# need to change this.
 TEMPLATE = "%(bold)s%(project)s:%(bold)s %(green)s%(author)s%(reset)s * r%(bold)s%(revision)s%(bold)s /%(files)s%(bold)s:%(bold)s %(log)s"
+
+# No user-serviceable parts below this line.
 
 debug = False
 simulate = False
