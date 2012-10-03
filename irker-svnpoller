@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-irker-svnpoller.pl - Polls a specified SVN commit and sends it to
-                     an IRC channel using irkerd.
+irker-svnpoller - Polls a specified SVN commit and sends it to
+                  an IRC channel using irkerd
 
 Copyright (C) 2012 by Ignacio Riquelme Morelle <shadowm2006@gmail.com>
 
