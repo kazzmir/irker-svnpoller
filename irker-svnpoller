@@ -24,11 +24,18 @@ POSSIBILITY OF SUCH DAMAGE.
 
 import argparse, json, os, pysvn, re, socket, sys
 
-# Maximum number of non-empty commit message lines to send
-# to irkerd. If there are more non-empty lines than this
-# value, "(Log message trimmed)" will be added in a new
-# line at the end.
-MAX_COMMIT_LINES = 5
+# Whether to send full commit messages, or just the subject
+# lines.
+COMMIT_SUBJECTS_ONLY = False
+
+# Maximum number of non-empty commit message body lines to
+# send to irkerd when using full commit messages. This value
+# is only used when COMMIT_SUBJECTS_ONLY is set to False.
+# If there are more non-empty lines than this value, "(Log
+# message trimmed)" will be added in a new line at the end.
+# When set to 0, it behaves as if COMMIT_SUBJECTS_ONLY were
+# set to True.
+MAX_COMMIT_BODY_LINES = 5
 
 # Hostname to use when connecting to an irkerd instance.
 IRKER_HOST = 'localhost'
@@ -65,7 +72,10 @@ class IrkerSVNSource:
         else:
             author = '<Unknown>'
         if 'message' in log:
-            message = log['message']
+            if COMMIT_SUBJECTS_ONLY:
+                message = log['message'].splitlines()[0]
+            else:
+                message = "\n" + log['message']
         else:
             message = '<Missing commit message>'
         msg = self._template % {
@@ -132,8 +142,9 @@ def deliver_to_irker(uri, message):
     for line in message.splitlines():
         line = line.strip()
         if line:
-            if len(lines) > MAX_COMMIT_LINES:
-                lines.append("(Log message trimmed.)")
+            if len(lines) > MAX_COMMIT_BODY_LINES + 1:
+                if MAX_COMMIT_BODY_LINES != 0:
+                    lines.append("(Log message trimmed.)")
                 break
             lines.append(line)
     envelope = json.dumps({ "to": uri, "privmsg": "\n".join(lines) })
