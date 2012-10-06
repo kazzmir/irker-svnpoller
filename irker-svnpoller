@@ -43,6 +43,9 @@ IRKER_HOST = 'localhost'
 # Port number to use when connecting to an irkerd instance.
 IRKER_PORT = 6659
 
+# Sleep 10 minutes inbetween polling
+SLEEP_TIME = 60 * 10
+
 # The commit notification template. You probably do not
 # need to change this.
 TEMPLATE = "%(bold)s%(project)s:%(bold)s %(green)s%(author)s%(reset)s * r%(bold)s%(revision)s%(bold)s /%(files)s%(bold)s:%(bold)s %(log)s"
@@ -59,6 +62,11 @@ class IrkerSVNSource:
         self.repository = repository
         self._client = pysvn.Client()
         self._template = TEMPLATE
+
+    def get_head(self):
+        revision = pysvn.Revision(pysvn.opt_revision_kind.head)
+        log = self._client.log(self.repository, revision, revision)[0]
+        return log['revision'].number
 
     def generate_notification(self, revision):
         "Generate a message for irkerd deliver from the given commit."
@@ -154,10 +162,28 @@ def deliver_to_irker(uri, message):
         (host, port) = (IRKER_HOST, IRKER_PORT)
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            print "Sending %s" % envelope
             sock.sendto(envelope + "\n", (host, port))
         finally:
             sock.close()
 
+def send_revision(revision, uri):
+    try:
+        message = source.generate_notification(str(revision))
+        deliver_to_irker(uri, message)
+    except pysvn.ClientError, e:
+        sys.stderr.write("pysvn.ClientError: %s\n" % e.message)
+
+def poll(source, uri):
+    import time
+    now = source.get_head()
+    while True:
+        more = source.get_head()
+        for revision in xrange(now + 1, more + 1):
+            send_revision(revision, uri)
+        now = more
+
+        time.sleep(SLEEP_TIME)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -173,11 +199,12 @@ if __name__ == '__main__':
     debug = args.debug
     simulate = args.simulate
     source = IrkerSVNSource(args.project_id, args.repository_URI)
-    try:
-        message = source.generate_notification(args.revision_or_HEAD)
-        for uri in args.channel_URI:
-            deliver_to_irker(uri, message)
-    except pysvn.ClientError, e:
-        sys.stderr.write("pysvn.ClientError: %s\n" % e.message)
+    poll(source, args.channel_URI[0])
+    #try:
+    #    message = source.generate_notification(args.revision_or_HEAD)
+    #    for uri in args.channel_URI:
+    #        deliver_to_irker(uri, message)
+    #except pysvn.ClientError, e:
+    #    sys.stderr.write("pysvn.ClientError: %s\n" % e.message)
 
 # kate: indent-mode normal; encoding utf-8; space-indent on;
